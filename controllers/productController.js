@@ -41,6 +41,79 @@ const getProductById = async (req, res) => {
   }
 };
 
+// Get products by subcategory
+const getProductsBySubcategory = async (req, res) => {
+  try {
+    const { subcategory } = req.query;
+    
+    if (!subcategory) {
+      return res.status(400).json({
+        success: false,
+        message: "Subcategory parameter is required",
+      });
+    }
+
+    // Case-insensitive search for subcategory in the array
+    const products = await Product.find({
+      subcategory: { 
+        $elemMatch: { 
+          $regex: new RegExp(subcategory, 'i') 
+        } 
+      }
+    });
+
+    res.json({
+      success: true,
+      count: products.length,
+      subcategory,
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching products by subcategory",
+      error: error.message,
+    });
+  }
+};
+
+// Get products by category
+const getProductsByCategory = async (req, res) => {
+  try {
+    const { category } = req.query;
+
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        message: "Category parameter is required",
+      });
+    }
+
+    // Case-insensitive match inside category array
+    const products = await Product.find({
+      category: {
+        $elemMatch: {
+          $regex: new RegExp(category, 'i')
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      count: products.length,
+      category,
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching products by category",
+      error: error.message,
+    });
+  }
+};
+
+
 // Create new product
 const createProduct = async (req, res) => {
   try {
@@ -249,12 +322,11 @@ const getProductList = async (req, res) => {
   }
 };
 
-
-
-
 module.exports = {
   getAllProducts,
   getProductById,
+  getProductsBySubcategory,
+  getProductsByCategory,
   createProduct,
   updateProduct,
   deleteProduct,

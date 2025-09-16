@@ -76,33 +76,77 @@ const getUserCart = async (req, res) => {
   }
 };
 
+// const removeItemFromCart = async (req, res) => {
+//   try {
+//     const { productId, size } = req.body;
+
+//     // Validate the productId
+//     if (!mongoose.Types.ObjectId.isValid(productId)) {
+//       return res.status(400).json({ message: 'Invalid product ID' });
+//     }
+
+//     const cart = await Cart.findOne({ userId: req.user._id });
+//     if (!cart) return res.status(404).json({ message: 'Cart not found' });
+
+//     // Filter the items by both productId and size
+//     const itemIndex = cart.items.findIndex(item => item.productId.equals(productId) && item.size === size);
+
+//     // If the item is found, remove it
+//     if (itemIndex !== -1) {
+//       cart.items.splice(itemIndex, 1);
+//       await cart.save();
+
+//       return res.status(200).json({ message: 'Item removed from cart', cart });
+//     } else {
+//       return res.status(404).json({ message: 'Item not found in cart' });
+//     }
+
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error removing item from cart', error: error.message });
+//   }
+// };
+
 const removeItemFromCart = async (req, res) => {
   try {
-    const { productId, size } = req.body;
+    const { productId, size, color } = req.body;
 
-    // Validate the productId
+    // Validate productId
     if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ message: 'Invalid product ID' });
+      return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const cart = await Cart.findOne({ userId: req.user._id });
-    if (!cart) return res.status(404).json({ message: 'Cart not found' });
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
 
-    // Filter the items by both productId and size
-    const itemIndex = cart.items.findIndex(item => item.productId.equals(productId) && item.size === size);
+    // Match productId + size + color
+    const itemIndex = cart.items.findIndex(
+      (item) =>
+        item.productId.equals(productId) &&
+        item.size === size &&
+        item.color === color
+    );
 
-    // If the item is found, remove it
     if (itemIndex !== -1) {
-      cart.items.splice(itemIndex, 1);
+      if (cart.items[itemIndex].quantity > 1) {
+        // ✅ Decrease quantity if more than 1
+        cart.items[itemIndex].quantity -= 1;
+      } else {
+        // ✅ Remove item completely if quantity = 1
+        cart.items.splice(itemIndex, 1);
+      }
+
       await cart.save();
-
-      return res.status(200).json({ message: 'Item removed from cart', cart });
+      return res.status(200).json({
+        message: "Item removed from cart",
+        cart,
+      });
     } else {
-      return res.status(404).json({ message: 'Item not found in cart' });
+      return res.status(404).json({ message: "Item not found in cart" });
     }
-
   } catch (error) {
-    res.status(500).json({ message: 'Error removing item from cart', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error removing item from cart", error: error.message });
   }
 };
 
