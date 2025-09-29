@@ -1,21 +1,22 @@
 const express = require("express");
-// import { isAdmin, protect } from "../middleware/authMiddleware.js";
-const {createOffer, getOffer, deleteOffer, updateOffer}  = require("../controllers/offerController.js")
+const {
+  createOffer,
+  getOffer,
+  updateOffer,
+  deleteOffer,
+  getOfferById,
+  getActiveMahasales
+  // applyOffer
+} = require("../controllers/offerController");
 
-const router = express.Router()
+const router = express.Router();
 
-router.post('/create-offer',
-    // protect,
-    // isAdmin,
-    createOffer
-)
+router.post("/create-offer", createOffer);
+router.get('/mahasales/active', getActiveMahasales);
+router.get("/get-offer", getOffer);
+router.get("/get-offer/:id", getOfferById);
+router.put("/update-offer/:id", updateOffer);
+router.delete("/delete-offer/:id", deleteOffer);
 
-router.get('/get-offer',getOffer)
-
-// router.post('/apply-offer',applyOffer)
-
-router.delete('/delete-offer/:id',deleteOffer)
-
-router.put('/update-offer/:id', updateOffer);
 
 module.exports = router;

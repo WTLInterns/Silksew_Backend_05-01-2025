@@ -20,6 +20,21 @@ const productSchema = new mongoose.Schema({
     default: null,
     min: 0,
   },
+  discountPercent: {
+  type: Number,
+  default: 0,
+},
+
+offerStartDate: {
+  type: Date,
+  default: null,
+},
+
+offerEndDate: {
+  type: Date,
+  default: null,
+},
+
   category: {
     type: [String],
     required: true,

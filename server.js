@@ -24,7 +24,7 @@ const updateOrderStatus = require("./routes/orderRoutes")
 
 const offerRoutes = require('./routes/offerRoutes')
 const paymentGatewayRoutes = require("./routes/paymentGatewayRoute");
-
+const subscribeRoutes = require ("./routes/subscribeRoutes")
 
 
 
@@ -65,7 +65,11 @@ app.use("/api/updatePayment", updatePaymentStatus)
 
 app.use('/api/userProfileDetail', userRoutes)
 app.use('/api/updateUserProfileDetail', userRoutes)
+
 app.use("/api/offer",offerRoutes);
+
+app.use("/api",subscribeRoutes);
+
 app.use("/api/payment", paymentGatewayRoutes);
 app.use("/api/favorites", favoriteRoutes);
 

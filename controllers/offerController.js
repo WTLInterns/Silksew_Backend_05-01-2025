@@ -1,248 +1,299 @@
 const Offer = require("../models/offer")
+const mongoose = require ("mongoose")
 
-const createOffer = async (req, res)=>{
-    // const {code,offerType, value, description,startDate,endDate,eligibleProducts,active} = req.body;
-    const {code, offerType, value, description, startDate, endDate, active} = req.body;
-    try {
-        // console.log(code, offerType, value, description,startDate,endDate,eligibleProducts,active);
-        console.log(code, offerType, value, description, startDate, endDate, active);
-        // const offer = new Offer({code, offerType, value, description,startDate,endDate,eligibleProducts,active});
-        const offer = new Offer({code, offerType, value, description, startDate, endDate, active});
-        console.log(offer)
-        await offer.save();
-        res.status(200).json({success:true,offer});
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({success:false,message:"Failed to create offer"})
+const createOffer = async (req, res) => {
+  const {
+    code,
+    offerScope,
+    category,
+    offerType,
+    value,
+    description,
+    startDate,
+    endDate,
+    active,
+    price,
+    productId,
+    mahasale
+  } = req.body;
+
+  console.log("debugging",req.body);
+
+  try {
+    console.log("📥 Incoming request body:", JSON.stringify(req.body, null, 2));
+
+    // 1️⃣ Initialize calculation defaults
+    let discountAmount = 0;
+    let discountPercent = 0;
+    let finalPrice = price || 0;
+
+    // 2️⃣ FIXED: Determine if discount should be applied (include mahasale)
+    const shouldApplyDiscount =
+      (offerScope === "category" && category) || 
+      (offerScope === "mahasale");
+
+    // 3️⃣ Calculate discount if price exists
+    if (price && shouldApplyDiscount) {
+      if (offerType === "percentage") {
+        discountPercent = value;
+        discountAmount = (price * value) / 100;
+      } else if (offerType === "flat") {
+        discountAmount = value;
+        discountPercent = ((value / price) * 100).toFixed(2);
+      }
+
+      finalPrice = price - discountAmount;
+      if (finalPrice < 0) finalPrice = 0;
     }
-}
 
+    // 4️⃣ Prepare calculation data
+    const calculationData = {
+      actualPrice: price || 0,
+      discountAmount,
+      discountPercent: `${discountPercent}%`,
+      finalPrice,
+    };
 
-// const getOffer = async (req, res)=>{
+    console.log("⚡ Calculation Data:", calculationData);
+
+    // 5️⃣ Create Offer data - FIXED: Only include category if it's a category offer
+    const offerData = {
+      code,
+      offerScope,
+      offerType,
+      value: Number(value),
+      description,
+      startDate,
+      endDate,
+      active: Boolean(active),
+      calculation: calculationData,
+    };
+
+    // Add category only for category offers
+    if (offerScope === "category") {
+      offerData.category = category;
+    }
+
+    // If offer is mahasale, attach festival data
+    if (offerScope === "mahasale" && mahasale) {
+      offerData.mahasale = {
+        festivalName: mahasale.festivalName || "Festival Sale",
+        bannerImage: mahasale.bannerImage || "",
+        status: mahasale.status || "COMING SOON",
+        themeColor: mahasale.themeColor || "#ff3e6c",
+        featuredText: mahasale.featuredText || "",
+      };
+    }
+
+    const offer = new Offer(offerData);
+    const data = await offer.save();
+    console.log("💾 Offer saved successfully:", JSON.stringify(data, null, 2));
+
+    // 6️⃣ Send response
+    res.status(201).json({
+      success: true,
+      message: "Offer created successfully",
+      offer: data,
+    });
+  } catch (error) {
+    console.error("❌ Error creating offer:", error);
+    console.error("❌ Error details:", error.message);
+    console.error("❌ Error stack:", error.stack);
     
-//         try {
-//             const offers = await Offer.find({
-//                 active:true,
-//                 startDate:{$lte:new Date()},
-//                 endDate:{$gte:new Date()}
-//             })
-//             res.status(200).json({success:true,offers})
-//         } catch (error) {
-//             console.log(error)
-//             res.status(500).json({success:false,message:"Failed to fetch offers",error:error.message})
-//         }
-        
-// }
-
- const getOffer = async (req, res) => {
-  const now = new Date();
-
-  const active = await Offer.findOne({
-    startDate: { $lte: now },
-    endDate: { $gte: now },
-    active: true
-  });
-
-  if (active) {
-    return res.json({ status: "active", offer: active });
-  }
-
-  const upcoming = await Offer.findOne({
-    startDate: { $gt: now },
-    active: true
-  }).sort({ startDate: 1 });
-
-  if (upcoming) {
-    return res.json({ status: "upcoming", offer: upcoming });
-  }
-
-  res.json({ status: "none" });
-};
-
-
-  
-
-// const applyOffer = async (req, res)=>{
-//     try {
-//         const {offerCode, cartItems,totalAmount} = req.body;
-//         console.log(`offerCode:${offerCode},totalAmount:${totalAmount},userCart:${JSON.stringify(cartItems)}`);
-
-//         const offer = await Offer.findOne({code:offerCode});
-//         // console.log(offer);
-
-//          // Check if the offer is valid
-//         if(!offer || !offer.active || offer.startDate > new Date() || offer.endDate < new Date()){
-//             return res.status(400).json({success:false, message:'Invalid or expired offer'})
-//         }
-
-//          // Check eligibility (optional, e.g., for specific products)
-//     const eligibleProducts = offer.eligibleProducts
-//     console.log(`eligibleProducts:${eligibleProducts}`)
-//     const applicableProducts = cartItems.filter(item =>
-//       eligibleProducts.length ? eligibleProducts.includes(item.productId) : true
-//     );
-//     console.log(`applicableProducts:${JSON.stringify(applicableProducts)}`)
-//     console.log(`length of applicableProducts:${applicableProducts.length}`)
-
-//     let discountAmount = 0;
-//     console.log(`totalAmount:${totalAmount}`)
-
-//     if (offer.offerType === 'percentage') {
-//         // Apply percentage discount
-//         console.log('percentage offer')
-//         discountAmount = (totalAmount * offer.value) / 100;
-//       } else if (offer.type === 'flat') {
-//         // Apply flat discount
-//         discountAmount = offer.value;
-//       }
-      
-//       // Apply discount to total cart value
-//     const newTotalAmount = totalAmount - discountAmount;
-//     console.log(`discountAmount:${discountAmount}`)
-//     console.log(`newTotalAmount:${newTotalAmount}`)
-
-//     res.status(200).json({
-//         success: true,
-//         message: `Offer applied successfully! Discount: $${discountAmount}`,
-//         newTotalAmount,
-//       });
-  
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({success:false,message:"Failed to apply offers",error:error.message})
-//     }
-// }
-
-
-// const applyOffer = async (req, res) => {
-//   try {
-//     const { offerCode, cartItems, totalAmount } = req.body;
-//     console.log(`offerCode: ${offerCode}, totalAmount: ${totalAmount}, userCart: ${JSON.stringify(cartItems)}`);
-
-//     const offer = await Offer.findOne({ code: offerCode });
-
-//     // Check if the offer is valid
-//     if (!offer || !offer.active || offer.startDate > new Date() || offer.endDate < new Date()) {
-//       return res.status(400).json({ success: false, message: 'Invalid or expired offer' });
-//     }
-
-//     let discountAmount = 0;
-//     console.log(`totalAmount: ${totalAmount}`);
-
-//     // Apply discount based on offer type
-//     if (offer.offerType === 'percentage') {
-//       console.log('percentage offer');
-//       discountAmount = (totalAmount * offer.value) / 100;
-//     } else if (offer.offerType === 'flat') {
-//       console.log('flat offer');
-//       discountAmount = offer.value;
-//     }
-
-//     const newTotalAmount = totalAmount - discountAmount;
-//     console.log(`discountAmount: ${discountAmount}`);
-//     console.log(`newTotalAmount: ${newTotalAmount}`);
-
-//    offer.lastUsedAmount = newTotalAmount;
-//     await offer.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: `Offer applied successfully! Discount: ₹${discountAmount}`,
-//       newTotalAmount,
-//     });
-
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).json({ success: false, message: "Failed to apply offers", error: error.message });
-//   }
-// };
-
-
-
-
-// const deleteOffer = async (req, res)=>{
-//     try {
-//         const offerCode = req.body;
-//         console.log(offerCode);
-
-//         const offer = await Offer.findOneAndDelete({offerCode})
-//         if(!offer){
-//             res.status(400).json({success:false,message:"Offer is not exist with this offer code"})
-//         }
-
-//         res.status(200).json({
-//             success:true,
-//             message:"Offer deleted successfully."
-//         })
-
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({success:false, message:"Failed to delete offer",error:error.message})
-//     }
-// }
-
-
-const deleteOffer = async (req, res) => {
-    try {
-        const offerId = req.params.id; // Getting the offer ID from the URL parameter
-        console.log(offerId);
-
-        // Find and delete the offer by _id
-        const offer = await Offer.findByIdAndDelete(offerId);
-        
-        if (!offer) {
-            return res.status(400).json({
-                success: false,
-                message: "Offer does not exist with this ID"
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Offer deleted successfully."
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to delete offer",
-            error: error.message
-        });
+    // More specific error handling
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Offer code already exists" 
+      });
     }
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Validation error: ${error.message}` 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to create offer",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 };
+
+
+
+const getActiveMahasales = async (req, res) => {
+  try {
+    const currentDate = new Date();
+    console.log("🕒 Current server time:", currentDate.toISOString());
+    
+    // Debug: Check all mahasale offers first
+    const allMahasales = await Offer.find({ offerScope: "mahasale" });
+    console.log("📋 All mahasale offers in DB:", allMahasales.length);
+    
+    if (allMahasales.length > 0) {
+      allMahasales.forEach(offer => {
+        console.log(`\n📊 Offer: ${offer.code}`);
+        console.log(`   Active: ${offer.active}`);
+        console.log(`   Start Date: ${offer.startDate}`);
+        console.log(`   End Date: ${offer.endDate}`);
+        console.log(`   Current Date: ${currentDate}`);
+        console.log(`   Start <= Current: ${offer.startDate <= currentDate}`);
+        console.log(`   End >= Current: ${offer.endDate >= currentDate}`);
+        console.log(`   Is Active Now: ${offer.active && offer.startDate <= currentDate && offer.endDate >= currentDate}`);
+      });
+    } else {
+      console.log("❌ No mahasale offers found in database");
+    }
+    
+    // Get active mahasales with proper date comparison
+    const mahasales = await Offer.find({
+      offerScope: "mahasale",
+      active: true,
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate }
+    }).sort({ createdAt: -1 });
+
+    console.log("✅ Active mahasales found:", mahasales.length);
+    
+    res.status(200).json({
+      success: true,
+      mahasales,
+      count: mahasales.length,
+      currentTime: currentDate.toISOString() // Helpful for debugging
+    });
+  } catch (error) {
+    console.error("❌ Error fetching mahasales:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch mahasales",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+const getOffer = async (req, res) => {
+  try {
+    const today = new Date();
+
+    const offers = await Offer.find({
+      active: true,
+      endDate: { $gte: today },
+    });
+
+    // Countdown calculate करून attach करू
+    const offersWithCountdown = offers.map((offer) => {
+      const endDate = new Date(offer.endDate);
+      const now = new Date();
+      let timeLeft = endDate - now;
+
+      if (timeLeft < 0) {
+        timeLeft = 0; // Expired असेल तर 0
+      }
+
+      return {
+        ...offer.toObject(),
+        timeLeft, // milliseconds मध्ये उरलेला वेळ
+      };
+    });
+
+    res.status(200).json({ success: true, offers: offersWithCountdown });
+  } catch (error) {
+    console.error("Error fetching offers:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch offers" });
+  }
+};
+
+
+const getOfferById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if id is valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid offer ID" });
+    }
+
+    const offer = await Offer.findById(id);
+
+    if (!offer) {
+      return res.status(404).json({ success: false, message: "Offer not found" });
+    }
+
+    // countdown attach kara (same as getOffer)
+    const endDate = new Date(offer.endDate);
+    const now = new Date();
+    let timeLeft = endDate - now;
+
+    if (timeLeft < 0) timeLeft = 0;
+
+    res.status(200).json({ 
+      success: true, 
+      offer: { ...offer.toObject(), timeLeft } 
+    });
+  } catch (error) {
+    console.error("Error fetching offer by ID:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch offer by ID" });
+  }
+};
+
+
 
 
 const updateOffer = async (req, res) => {
-    const { id } = req.params; // Get the offer ID from the request parameters
-    const { code, value, description, startDate, endDate} = req.body;
+  const { id } = req.params;
+  const updateData = req.body;
 
-    try {
-        // Find the offer by ID and update it
-        const offer = await Offer.findByIdAndUpdate(
-            id,
-            { code, value, description, startDate, endDate},
-            { new: true } // To return the updated offer
-        );
+  try {
+    const offer = await Offer.findByIdAndUpdate(id, updateData, { new: true });
 
-        // Check if the offer exists
-        if (!offer) {
-            return res.status(404).json({ success: false, message: "Offer not found" });
-        }
-
-        // Send the updated offer back
-        res.status(200).json({ success: true, offer });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: "Failed to update offer" });
+    if (!offer) {
+      return res.status(404).json({ success: false, message: "Offer not found" });
     }
+
+    res.status(200).json({ success: true, offer });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to update offer" });
+  }
 };
 
 
+const deleteOffer = async (req, res) => {
+  try {
+    const offerId = req.params.id;
+    const offer = await Offer.findByIdAndDelete(offerId);
+
+    if (!offer) {
+      return res.status(400).json({
+        success: false,
+        message: "Offer does not exist with this ID",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Offer deleted successfully.",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete offer",
+      error: error.message,
+    });
+  }
+};
 
 
 module.exports = {
     createOffer,
+    getActiveMahasales,
     getOffer,
     updateOffer,
-    deleteOffer
+    deleteOffer,
+    getOfferById,
 }

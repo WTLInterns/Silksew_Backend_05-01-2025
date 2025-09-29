@@ -45,7 +45,7 @@ const getProductById = async (req, res) => {
 const getProductsBySubcategory = async (req, res) => {
   try {
     const { subcategory } = req.query;
-    
+
     if (!subcategory) {
       return res.status(400).json({
         success: false,
@@ -55,10 +55,10 @@ const getProductsBySubcategory = async (req, res) => {
 
     // Case-insensitive search for subcategory in the array
     const products = await Product.find({
-      subcategory: { 
-        $elemMatch: { 
-          $regex: new RegExp(subcategory, 'i') 
-        } 
+      subcategory: {
+        $elemMatch: {
+          $regex: new RegExp(subcategory, 'i')
+        }
       }
     });
 
@@ -149,15 +149,15 @@ const createProduct = async (req, res) => {
     // ✅ Process availableColors
     const processedColors = Array.isArray(availableColors)
       ? availableColors.map((color) =>
-          typeof color === "object" && color.name ? color.name.trim() : String(color).trim()
-        )
+        typeof color === "object" && color.name ? color.name.trim() : String(color).trim()
+      )
       : [];
 
     // ✅ Process availableSizes
     const processedSizes = Array.isArray(availableSizes)
       ? availableSizes.map((size) =>
-          typeof size === "object" && size.name ? size.name.trim() : String(size).trim()
-        )
+        typeof size === "object" && size.name ? size.name.trim() : String(size).trim()
+      )
       : [];
 
     // ✅ Console logs
@@ -200,12 +200,66 @@ const createProduct = async (req, res) => {
 
 
 // Update product
+// const updateProduct = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updateData = { ...req.body };
+
+//     // Handle category and subcategory conversion if they exist in update data
+//     if (updateData.category) {
+//       updateData.category = typeof updateData.category === "string"
+//         ? updateData.category.split(",").map((cat) => cat.trim())
+//         : updateData.category;
+//     }
+
+//     if (updateData.subcategory) {
+//       updateData.subcategory = typeof updateData.subcategory === "string"
+//         ? updateData.subcategory.split(",").map((sub) => sub.trim())
+//         : updateData.subcategory;
+//     }
+
+//     // Handle availableSizes and availableColors
+//     if (updateData.availableSizes && !Array.isArray(updateData.availableSizes)) {
+//       updateData.availableSizes = [updateData.availableSizes];
+//     }
+//     if (updateData.availableColors && !Array.isArray(updateData.availableColors)) {
+//       updateData.availableColors = [updateData.availableColors];
+//     }
+
+//     const product = await Product.findByIdAndUpdate(id, updateData, {
+//       new: true,
+//       runValidators: true,
+//     });
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       product,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Error updating product",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+// Update Product with Discount Calculation
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
 
-    // Handle category and subcategory conversion if they exist in update data
+    // Handle category and subcategory
     if (updateData.category) {
       updateData.category = typeof updateData.category === "string"
         ? updateData.category.split(",").map((cat) => cat.trim())
@@ -218,7 +272,7 @@ const updateProduct = async (req, res) => {
         : updateData.subcategory;
     }
 
-    // Handle availableSizes and availableColors
+    // Handle sizes and colors
     if (updateData.availableSizes && !Array.isArray(updateData.availableSizes)) {
       updateData.availableSizes = [updateData.availableSizes];
     }
@@ -226,23 +280,46 @@ const updateProduct = async (req, res) => {
       updateData.availableColors = [updateData.availableColors];
     }
 
-    const product = await Product.findByIdAndUpdate(id, updateData, {
+    // Fetch existing product
+    const existingProduct = await Product.findById(id);
+    if (!existingProduct) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    // Discount calculation logic
+    if (updateData.discountPercent && updateData.discountPercent > 0) {
+      const now = new Date();
+      const startDate = updateData.offerStartDate ? new Date(updateData.offerStartDate) : null;
+      const endDate = updateData.offerEndDate ? new Date(updateData.offerEndDate) : null;
+
+      // Offer active check
+      if ((!startDate || now >= startDate) && (!endDate || now <= endDate)) {
+        updateData.oldPrice = existingProduct.price; // original price
+        // Round discounted price to whole number
+        updateData.price = Math.round(existingProduct.price * (1 - updateData.discountPercent / 100));
+      } else {
+        updateData.price = existingProduct.price;
+        updateData.oldPrice = null;
+      }
+    } else {
+      // No discount, reset
+      updateData.oldPrice = null;
+      updateData.price = existingProduct.price;
+    }
+
+    // Update product in DB
+    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
-    }
-
     res.json({
       success: true,
-      product,
+      product: updatedProduct,
     });
+
   } catch (error) {
+    console.error("Update product error:", error);
     res.status(500).json({
       success: false,
       message: "Error updating product",
@@ -250,6 +327,8 @@ const updateProduct = async (req, res) => {
     });
   }
 };
+
+
 
 // Delete product
 const deleteProduct = async (req, res) => {
@@ -276,32 +355,7 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-// Get product list (paginated)
-// const getProductList = async (req, res) => {
-//   try {
-//     const { page = 1, limit = 10 } = req.query;
 
-//     const products = await Product.find()
-//       .skip((page - 1) * limit)
-//       .limit(parseInt(limit));
-
-//     const totalProducts = await Product.countDocuments();
-
-//     res.json({
-//       success: true,
-//       totalProducts,
-//       currentPage: parseInt(page),
-//       totalPages: Math.ceil(totalProducts / limit),
-//       products,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: "Error fetching product list",
-//       error: error.message,
-//     });
-//   }
-// };
 
 const getProductList = async (req, res) => {
   try {
