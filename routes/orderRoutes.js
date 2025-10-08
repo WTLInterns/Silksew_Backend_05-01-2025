@@ -15,6 +15,7 @@ const {
   saveReturnReason,
   // updateReturnStatus,
   updateReturnAction,
+  getTrackingData
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -30,6 +31,9 @@ router.get("/", protect, getAllOrders);
 
 // Payment Features
 router.post("/place", protect, placeOrder);
+
+router.get("/track/:orderId", getTrackingData);
+
 router.post("/stripe", protect, placeOrderStripe);
 router.post("/razorpay", protect, placeOrderRazorpay);
 

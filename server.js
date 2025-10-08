@@ -24,9 +24,9 @@ const updateOrderStatus = require("./routes/orderRoutes")
 
 const offerRoutes = require('./routes/offerRoutes')
 const paymentGatewayRoutes = require("./routes/paymentGatewayRoute");
-const subscribeRoutes = require ("./routes/subscribeRoutes")
+const subscribeRoutes = require ("./routes/subscribeRoutes");
 
-
+const { getShiprocketToken } = require("./utils/shiprocketAuth");
 
 
 // Load environment variables
@@ -73,6 +73,7 @@ app.use("/api",subscribeRoutes);
 app.use("/api/payment", paymentGatewayRoutes);
 app.use("/api/favorites", favoriteRoutes);
 
+
 // Default route for root endpoint
 app.get("/", (req, res) => {
   res.send("API is running...")
@@ -85,6 +86,16 @@ app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`)
   next()
 })
+
+
+setInterval(async () => {
+  try {
+    await getShiprocketToken();
+  } catch (err) {
+    console.error("Error refreshing Shiprocket token:", err);
+  }
+}, 24 * 60 * 60 * 1000);
+
 
 // Start the server
 const PORT = process.env.PORT || 5000

@@ -36,6 +36,11 @@ console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "loaded" : "missing");
 // };
 
 // for signup
+
+
+
+
+
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, phone, street, city, state, zipcode } = req.body;
@@ -70,6 +75,11 @@ const registerUser = async (req, res) => {
     res.status(500).json({ message: 'Error registering user', error: error.message });
   }
 };
+
+
+
+
+
 
 
 // Login a user
@@ -114,55 +124,7 @@ const loginUser = async (req, res) => {
   }
 };
 
-// const loginUser = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
 
-//     // Validate required fields
-//     if (!email || !password) {
-//       return res.status(400).json({ message: "Email and password are required" });
-//     }
-
-//     // Check if the user exists
-//     const user = await User.findOne({ email });
-//     if (!user) {
-//       return res.status(401).json({ message: "Invalid email or password" });
-//     }
-
-//     // Compare the provided password with the stored hashed password
-//     const isMatch = await user.comparePassword(password);
-//     if (!isMatch) {
-//       return res.status(401).json({ message: "Invalid email or password" });
-//     }
-
-//     // Generate a JWT token
-//     const token = jwt.sign(
-//       { id: user._id, role: user.role },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "1d" }
-//     );
-
-//     // Send response with token and user information
-//     return res.status(200).json({
-//       token,
-//       user: {
-//         id: user._id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role, // Include role for frontend role-based navigation
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Login Error:", error.message);
-//     return res.status(500).json({
-//       message: "Error logging in",
-//       error: error.message,
-//     });
-//   }
-// };
-
-
-// Get user profile
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password'); // Exclude password from response

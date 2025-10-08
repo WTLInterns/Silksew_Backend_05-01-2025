@@ -254,6 +254,13 @@ const createProduct = async (req, res) => {
 
 
 // Update Product with Discount Calculation
+
+
+
+
+
+
+
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;

@@ -4,6 +4,9 @@ const Cart = require("../models/Cart");
 require("dotenv").config(); // Load .env file
 const User = require("../models/User");
 const sendOrderConfirmationEmail = require("./mailer");
+// const { getShiprocketToken } = require("../utils/shiprocketAuth");
+const axios = require("axios");
+
 
 const currency = "inr";
 const deliveryCharge = 10;
@@ -106,12 +109,12 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+
 // const placeOrder = async (req, res) => {
 //   try {
-//     const { items, totalAmount, address, paymentMethod } = req.body;
+//     const { items, totalAmount, address, paymentMethod, offerCode } = req.body;
 //     const userId = req.user?._id;
 
-//     // Validate required fields
 //     if (
 //       !userId ||
 //       !items ||
@@ -121,38 +124,61 @@ const getAllOrders = async (req, res) => {
 //       !address ||
 //       !paymentMethod
 //     ) {
-//       return res
-//         .status(400)
-//         .json({
-//           success: false,
-//           message:
-//             "All fields are required and items must be a non-empty array.",
-//         });
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required and items must be a non-empty array.",
+//       });
 //     }
 
-//     // Fetch user details
 //     const user = await User.findById(userId);
 //     if (!user) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "User not found" });
+//       return res.status(404).json({ success: false, message: "User not found" });
+//     }
+
+//     // Apply offer if offerCode is provided
+//     let discountAmount = 0;
+//     let finalAmount = totalAmount;
+//     if (offerCode) {
+//       const offer = await Offer.findOne({ code: offerCode });
+
+//       if (
+//         offer &&
+//         offer.active &&
+//         offer.startDate <= new Date() &&
+//         offer.endDate >= new Date()
+//       ) {
+//         if (offer.offerType === "percentage") {
+//           discountAmount = (totalAmount * offer.value) / 100;
+//         } else if (offer.offerType === "flat") {
+//           discountAmount = offer.value;
+//         }
+
+//         finalAmount = totalAmount - discountAmount;
+
+//         // Optional: Save the last used discount
+//         offer.lastUsedAmount = finalAmount;
+//         await offer.save();
+//         console.log("offer",offer)
+//       } else {
+//         return res.status(400).json({ success: false, message: "Invalid or expired offer code" });
+//       }
 //     }
 
 //     // Create a new order
 //     const newOrder = new Order({
 //       userId,
 //       items,
-//       totalAmount,
+//       totalAmount: finalAmount,
 //       address,
 //       paymentMethod,
+//       discountAmount,
 //       payment: false,
 //       date: new Date(),
+//       offerCode: offerCode || null, // save offerCode for record if any
 //     });
 
-//     // Save order to database
 //     await newOrder.save();
 
-//     // Send confirmation email with corrected item properties
 //     await sendOrderConfirmationEmail(
 //       user.email,
 //       items.map((item) => ({
@@ -160,18 +186,373 @@ const getAllOrders = async (req, res) => {
 //         quantity: item.quantity,
 //         price: item.price,
 //       })),
-//       totalAmount,
-//       address // Add this line
+//       finalAmount,
+//       address
 //     );
 
 //     res.status(201).json({
 //       success: true,
 //       message: "Order placed successfully",
 //       order: newOrder,
-//       userEmail: user.email, // Ensure frontend gets the email
+//       discountAmount,
+//       userEmail: user.email,
 //     });
 //   } catch (error) {
-//     console.error(" Order placement error:", error);
+//     console.error("Order placement error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// const placeOrder = async (req, res) => {
+//   try {
+//     const { items, totalAmount, address, paymentMethod, offerCode } = req.body;
+//     const userId = req.user?._id;
+
+//     if (
+//       !userId ||
+//       !items ||
+//       !Array.isArray(items) ||
+//       items.length === 0 ||
+//       !totalAmount ||
+//       !address ||
+//       !paymentMethod
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required and items must be a non-empty array.",
+//       });
+//     }
+
+//     const user = await User.findById(userId);
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: "User not found" });
+//     }
+
+//     // Apply offer if offerCode is provided
+//     let discountAmount = 0;
+//     let finalAmount = totalAmount;
+//     if (offerCode) {
+//       const offer = await Offer.findOne({ code: offerCode });
+
+//       if (
+//         offer &&
+//         offer.active &&
+//         offer.startDate <= new Date() &&
+//         offer.endDate >= new Date()
+//       ) {
+//         if (offer.offerType === "percentage") {
+//           discountAmount = (totalAmount * offer.value) / 100;
+//         } else if (offer.offerType === "flat") {
+//           discountAmount = offer.value;
+//         }
+
+//         finalAmount = totalAmount - discountAmount;
+//         offer.lastUsedAmount = finalAmount;
+//         await offer.save();
+//       } else {
+//         return res.status(400).json({ success: false, message: "Invalid or expired offer code" });
+//       }
+//     }
+
+//     // Create a new order
+//     const newOrder = new Order({
+//       userId,
+//       items,
+//       totalAmount: finalAmount,
+//       address,
+//       paymentMethod,
+//       discountAmount,
+//       payment: false,
+//       date: new Date(),
+//       offerCode: offerCode || null,
+//     });
+
+//     await newOrder.save();
+
+//     // Send order confirmation email (existing logic)
+//     await sendOrderConfirmationEmail(
+//       user.email,
+//       items.map((item) => ({
+//         name: item.productName,
+//         quantity: item.quantity,
+//         price: item.price,
+//       })),
+//       finalAmount,
+//       address
+//     );
+
+//     // ===== Shiprocket Integration =====
+//     try {
+//       const token = await getShiprocketToken(); 
+
+//       const shiprocketOrderData = {
+//         order_id: newOrder._id.toString(),
+//         order_date: new Date().toISOString(),
+//         pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION_ID,
+//         billing_customer_name: address.firstName + " " + address.lastName,
+//         billing_email: user.email,
+//         billing_phone: address.phone,
+//         billing_address: address.street,
+//         billing_city: address.city,
+//         billing_state: address.state,
+//         billing_postcode: address.pincode,
+//         shipping_is_billing: true,
+//         order_items: items.map((item) => ({
+//           name: item.productName,
+//           sku: item.productId,
+//           units: item.quantity,
+//           selling_price: item.price,
+//           discount: 0,
+//           tax: 0,
+//         })),
+//       };
+
+//       await axios.post(
+//         "https://apiv2.shiprocket.in/v1/external/orders/create/adhoc",
+//         shiprocketOrderData,
+//         {
+//           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+//         }
+//       );
+
+//       console.log("✅ Shiprocket order created");
+//     } catch (err) {
+//       console.error("❌ Shiprocket order creation failed:", err.response?.data || err.message);
+//     }
+//     // ===== End Shiprocket Integration =====
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Order placed successfully",
+//       order: newOrder,
+//       discountAmount,
+//       userEmail: user.email,
+//     });
+//   } catch (error) {
+//     console.error("Order placement error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+// const placeOrder = async (req, res) => {
+//   try {
+//     const { items, totalAmount, address, paymentMethod, offerCode } = req.body;
+//     const userId = req.user?._id;
+
+//     if (!userId || !items?.length || !totalAmount || !address || !paymentMethod) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required and items must be a non-empty array.",
+//       });
+//     }
+
+//     const user = await User.findById(userId);
+//     if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+//     // ===== Offer logic =====
+//     let discountAmount = 0;
+//     let finalAmount = totalAmount;
+//     if (offerCode) {
+//       const offer = await Offer.findOne({ code: offerCode });
+//       if (offer && offer.active && offer.startDate <= new Date() && offer.endDate >= new Date()) {
+//         discountAmount = offer.offerType === "percentage" ? (totalAmount * offer.value) / 100 : offer.value;
+//         finalAmount = totalAmount - discountAmount;
+//         offer.lastUsedAmount = finalAmount;
+//         await offer.save();
+//       } else return res.status(400).json({ success: false, message: "Invalid or expired offer code" });
+//     }
+
+//     // ===== Save order in MongoDB =====
+//     const newOrder = new Order({
+//       userId,
+//       items,
+//       totalAmount: finalAmount,
+//       address,
+//       paymentMethod,
+//       discountAmount,
+//       payment: false,
+//       date: new Date(),
+//       offerCode: offerCode || null,
+//     });
+//     await newOrder.save();
+//     console.log("✅ Order saved in MongoDB:", newOrder._id.toString());
+
+//     // ===== Send order confirmation email =====
+//     await sendOrderConfirmationEmail(
+//       user.email,
+//       items.map(item => ({
+//         name: item.productName,
+//         quantity: item.quantity,
+//         price: item.price,
+//       })),
+//       finalAmount,
+//       address
+//     );
+//     console.log("✅ Order confirmation email sent to user:", user.email);
+
+//     // ===== Shiprocket Integration =====
+//     const shiprocketOrderData = {
+//       order_id: newOrder._id.toString(),
+//       order_date: new Date().toISOString().slice(0, 19).replace("T", " "), // YYYY-MM-DD HH:mm:ss
+//       pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION_ID,//👈 name (not ID)
+//       channel_id: "", // optional
+//       comment: "Order created from SilkSew app",
+//       billing_customer_name: address.firstName,
+//       billing_last_name: address.lastName,
+//       billing_address: address.street,
+//       billing_address_2: "",
+//       billing_city: address.city,
+//       billing_pincode: address.pincode,
+//       billing_state: address.state,
+//       billing_country: "India",
+//       billing_email: user.email,
+//       billing_phone: "91" + address.phone,
+//       shipping_is_billing: true,
+//       shipping_customer_name: address.firstName,
+//       shipping_last_name: address.lastName,
+//       shipping_address: address.street,
+//       shipping_address_2: "",
+//       shipping_city: address.city,
+//       shipping_pincode: address.pincode,
+//       shipping_country: "India",
+//       shipping_state: address.state,
+//       shipping_email: user.email,
+//       shipping_phone: address.phone,
+//       order_items: items.map((item) => ({
+//         name: item.productName,
+//         sku: item.productId,
+//         units: item.quantity,
+//         selling_price: item.price,
+//         discount: 0,
+//         tax: 0,
+//       })),
+//       payment_method: paymentMethod === "Cash on Delivery" ? "COD" : "Prepaid",
+//       sub_total: totalAmount,
+//       length: 10, // cm
+//       breadth: 10,
+//       height: 10,
+//       weight: 1.5, // kg
+//     };
+
+
+//     // try {
+//     //   const token = await getShiprocketToken();
+//     //   let shiprocketResponse;
+//     //   const maxRetries = 3;
+
+//     //   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+//     //     try {
+//     //       shiprocketResponse = await axios.post(
+//     //         `${process.env.SHIPROCKET_BASE_URL}/orders/create/adhoc`,
+//     //         shiprocketOrderData,
+//     //         {
+//     //           headers: {
+//     //             Authorization: `Bearer ${token}`,
+//     //             "Content-Type": "application/json",
+//     //           },
+//     //         }
+//     //       );
+
+//     //       // ह्या ठिकाणी response check करायचा आहे
+//     //       console.log("📦 Shiprocket Response Data:", shiprocketResponse.data);
+
+//     //       if (shiprocketResponse.data?.order_id) break;
+//     //     } catch (err) {
+//     //       console.warn(`Shiprocket attempt ${attempt} failed:`, err.response?.data || err.message);
+//     //       if (attempt === maxRetries) throw err;
+//     //       await new Promise(r => setTimeout(r, 1000 * attempt));
+//     //     }
+//     //   }
+
+//     //   if (shiprocketResponse?.data?.order_id) {
+//     //     newOrder.shiprocketOrderId = shiprocketResponse.data.order_id;
+//     //     await newOrder.save();
+//     //     console.log("✅ Shiprocket order created:", shiprocketResponse.data.order_id);
+//     //   }
+
+//     // } catch (err) {
+//     //   console.error("❌ Shiprocket order creation failed:", err.response?.data || err.message);
+//     //   // Optional: send admin notification here
+//     // }
+
+//     // ===== Response =====
+
+//     try {
+//       const token = await getShiprocketToken();
+//       console.log("🔑 Shiprocket token:", token);
+
+//       let shiprocketResponse;
+//       const maxRetries = 3;
+
+//       for (let attempt = 1; attempt <= maxRetries; attempt++) {
+//         try {
+//           shiprocketResponse = await axios.post(
+//             `${process.env.SHIPROCKET_BASE_URL}/orders/create/adhoc`,
+//             shiprocketOrderData,
+//             {
+//               headers: {
+//                 Authorization: `Bearer ${token}`,
+//                 "Content-Type": "application/json",
+//               },
+//             }
+//           );
+
+//           // ✅ Response mil gaya
+//           console.log("📦 Shiprocket Response Data:", JSON.stringify(shiprocketResponse.data, null, 2));
+
+//           if (shiprocketResponse.data?.order_id) {
+//             console.log("✅ Shiprocket order created successfully!");
+//             break; // success, loop se bahar niklo
+//           } else {
+//             console.log("⚠️ Shiprocket response received but order_id missing");
+//           }
+
+//         } catch (err) {
+//           console.warn(`❌ Shiprocket attempt ${attempt} failed:`, err.response?.data || err.message);
+//           if (attempt === maxRetries) {
+//             console.error("❌ All Shiprocket attempts failed!");
+//             shiprocketResponse = null; // ensure response null hai
+//             break;
+//           }
+//           await new Promise(r => setTimeout(r, 1000 * attempt)); // retry delay
+//         }
+//       }
+
+//       if (shiprocketResponse?.data?.order_id) {
+//         newOrder.shiprocketOrderId = shiprocketResponse.data.order_id;
+//         await newOrder.save();
+//         console.log("✅ Shiprocket order ID saved in DB:", shiprocketResponse.data.order_id);
+//       } else {
+//         console.error("❌ Shiprocket order was NOT created.");
+//       }
+
+//     } catch (err) {
+//       console.error("❌ Shiprocket order creation failed with error:", err.response?.data || err.message);
+//     }
+
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Order placed successfully",
+//       order: newOrder,
+//       discountAmount,
+//       userEmail: user.email,
+//     });
+
+
+
+//   } catch (error) {
+//     console.error("Order placement error:", error);
 //     res.status(500).json({
 //       success: false,
 //       message: "Internal Server Error",
@@ -181,20 +562,25 @@ const getAllOrders = async (req, res) => {
 // };
 
 
+// Shiprocket token generate function
+const getShiprocketToken = async () => {
+  const response = await axios.post(
+    `${process.env.SHIPROCKET_BASE_URL}/auth/login`,
+    {
+      email: process.env.SHIPROCKET_EMAIL,
+      password: process.env.SHIPROCKET_PASSWORD,
+    }
+  );
+  console.log("✅ Shiprocket token generated successfully!");
+  return response.data.token;
+};
+
 const placeOrder = async (req, res) => {
   try {
-    const { items, totalAmount, address, paymentMethod, offerCode } = req.body;
+    const { items, totalAmount, address, paymentMethod } = req.body;
     const userId = req.user?._id;
 
-    if (
-      !userId ||
-      !items ||
-      !Array.isArray(items) ||
-      items.length === 0 ||
-      !totalAmount ||
-      !address ||
-      !paymentMethod
-    ) {
+    if (!userId || !items?.length || !totalAmount || !address || !paymentMethod) {
       return res.status(400).json({
         success: false,
         message: "All fields are required and items must be a non-empty array.",
@@ -202,79 +588,145 @@ const placeOrder = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
-    // Apply offer if offerCode is provided
-    let discountAmount = 0;
-    let finalAmount = totalAmount;
-    if (offerCode) {
-      const offer = await Offer.findOne({ code: offerCode });
-
-      if (
-        offer &&
-        offer.active &&
-        offer.startDate <= new Date() &&
-        offer.endDate >= new Date()
-      ) {
-        if (offer.offerType === "percentage") {
-          discountAmount = (totalAmount * offer.value) / 100;
-        } else if (offer.offerType === "flat") {
-          discountAmount = offer.value;
-        }
-
-        finalAmount = totalAmount - discountAmount;
-
-        // Optional: Save the last used discount
-        offer.lastUsedAmount = finalAmount;
-        await offer.save();
-        console.log("offer",offer)
-      } else {
-        return res.status(400).json({ success: false, message: "Invalid or expired offer code" });
-      }
-    }
-
-    // Create a new order
+    // ===== Save order in MongoDB =====
     const newOrder = new Order({
       userId,
       items,
-      totalAmount: finalAmount,
+      totalAmount,
       address,
       paymentMethod,
-      discountAmount,
       payment: false,
       date: new Date(),
-      offerCode: offerCode || null, // save offerCode for record if any
     });
-
     await newOrder.save();
+    console.log("✅ Order saved in MongoDB:", newOrder._id.toString());
 
-    await sendOrderConfirmationEmail(
-      user.email,
-      items.map((item) => ({
+    // ===== Shiprocket Integration =====
+    const shiprocketOrderData = {
+      order_id: newOrder._id.toString(),
+      order_date: new Date().toISOString().slice(0, 19).replace("T", " "),
+      pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION_NAME, // must be valid pickup location ID
+      comment: "Order from SilkSew app",
+      billing_customer_name: address.firstName,
+      billing_last_name: address.lastName,
+      billing_address: address.street,
+      billing_address_2: "",
+      billing_city: address.city,
+      billing_pincode: address.pincode,
+      billing_state: address.state,
+      billing_country: "India",
+      billing_email: user.email,
+      billing_phone: "91" + address.phone,
+      shipping_is_billing: true,
+      shipping_customer_name: address.firstName,
+      shipping_last_name: address.lastName,
+      shipping_address: address.street,
+      shipping_address_2: "",
+      shipping_city: address.city,
+      shipping_pincode: address.pincode,
+      shipping_state: address.state,
+      shipping_country: "India",
+      shipping_email: user.email,
+      shipping_phone: "91" + address.phone,
+      order_items: items.map((item) => ({
         name: item.productName,
-        quantity: item.quantity,
-        price: item.price,
+        sku: item.productId,
+        units: item.quantity,
+        selling_price: item.price,
+        discount: 0,
+        tax: 0,
       })),
-      finalAmount,
-      address
-    );
+      payment_method: paymentMethod === "Cash on Delivery" ? "COD" : "Prepaid",
+      sub_total: totalAmount,
+      length: 10,
+      breadth: 10,
+      height: 10,
+      weight: 1.5,
+    };
 
-    res.status(201).json({
+    try {
+      const token = await getShiprocketToken();
+      const shiprocketResponse = await axios.post(
+        `${process.env.SHIPROCKET_BASE_URL}/orders/create/adhoc`,
+        shiprocketOrderData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("📦 Shiprocket Response Data:", shiprocketResponse.data);
+
+      if (shiprocketResponse.data?.order_id) {
+        newOrder.shiprocketOrderId = shiprocketResponse.data.order_id;
+        await newOrder.save();
+        console.log(
+          "✅ Shiprocket order created:",
+          shiprocketResponse.data.order_id
+        );
+      } else {
+        console.error(
+          "❌ Shiprocket order was NOT created. Check pickup_location or fields."
+        );
+      }
+    } catch (err) {
+      console.error(
+        "❌ Shiprocket order creation failed:",
+        err.response?.data || err.message
+      );
+      // ⚠️ DO NOT send response here — just log the error
+    }
+
+    // ===== Response =====
+    // ✅ FIX #1: Send only ONE response at the end
+    console.log("📦 Final Order Response:", newOrder);
+    return res.status(201).json({
       success: true,
       message: "Order placed successfully",
-      order: newOrder,
-      discountAmount,
+      order: newOrder, // ✅ FIX #2: changed from `order` → `newOrder`
       userEmail: user.email,
     });
+
   } catch (error) {
     console.error("Order placement error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message,
+    if (!res.headersSent) {
+      // ✅ FIX #3: check before sending error response
+      return res.status(500).json({
+        success: false,
+        message: "Internal Server Error",
+        error: error.message,
+      });
+    }
+  }
+};
+
+const getTrackingData = async (req, res) => {
+  try {
+    const { orderId } = req.params; // <-- use req.params
+    const { channelId } = req.query; // optional: ?channelId=12345
+
+    if (!orderId)
+      return res.status(400).json({ success: false, message: "orderId is required" });
+
+    const token = await getShiprocketToken();
+
+    const url = `https://apiv2.shiprocket.in/v1/external/courier/track?order_id=${orderId}${channelId ? `&channel_id=${channelId}` : ""}`;
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
     });
+
+    return res.json({ success: true, data: response.data });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: err.response?.data || err.message });
   }
 };
 
@@ -457,59 +909,6 @@ const saveReturnReason = async (req, res) => {
   }
 };
 
-// const getReturnOrder = async (req, res) => {
-//   try {
-//     // Fetch orders where returnRequested is true in items
-//     const orders = await Order.find({ "items.returnRequested": true })
-//       .populate("userId", "firstName lastName email") // Populating userId with firstName, lastName, and email
-//       .populate("items.productId", "name"); // Populating productId with name
-//     console.log("orders", orders);
-
-//     // If no orders found
-//     if (!orders.length) {
-//       return res.status(404).json({ message: "No return requests found" });
-//     }
-
-//     // Format the fetched orders
-//     const formattedOrders = orders.flatMap((order) =>
-//       order.items
-//         .filter((item) => item.returnRequested)
-//         .map((returnItem) => {
-//           const productName = returnItem.productId
-//             ? returnItem.productId.name
-//             : "Unknown Product";
-
-//           return {
-//             _id: order._id,
-//             productName: productName,
-//             productId: returnItem.productId._id,
-//             firstName: order.userId ? order.userId.firstName : "Unknown", // Accessing firstName from populated userId
-//             lastName: order.userId ? order.userId.lastName : "Unknown", // Accessing lastName from populated userId
-//             email: order.userId ? order.userId.email : "Unknown", // Accessing email from populated userId
-//             street: order.address ? order.address.street : "Unknown",
-//             landmark: order.address ? order.address.landmark : "Unknown",
-//             city: order.address ? order.address.city : "Unknown",
-//             zipcode: order.address ? order.address.zipcode : "Unknown",
-//             country: order.address ? order.address.country : "Unknown",
-//             state: order.address ? order.address.state : "Unknown",
-//             phone: order.address ? order.address.phone : "Unknown",
-//             totalAmount: order.totalAmount,
-//             paymentMethod: order.paymentMethod,
-//             returnReason: returnItem.returnReason || "N/A",
-//             status: returnItem.returnApproved
-//               ? "Return Approved"
-//               : "Return Requested",
-//           };
-//         })
-//     );
-
-//     res.status(200).json(formattedOrders);
-//   } catch (error) {
-//     console.error("Error in getReturnOrder:", error);
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
-
 
 const getReturnOrder = async (req, res) => {
   try {
@@ -629,4 +1028,5 @@ module.exports = {
   saveReturnReason,
   getReturnOrder,
   updateReturnStatus,
+  getTrackingData
 };
