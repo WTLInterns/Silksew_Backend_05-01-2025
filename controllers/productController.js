@@ -199,13 +199,13 @@ const createProduct = async (req, res) => {
 
 
 
-// Update product
+
 // const updateProduct = async (req, res) => {
 //   try {
 //     const { id } = req.params;
 //     const updateData = { ...req.body };
 
-//     // Handle category and subcategory conversion if they exist in update data
+//     // Handle category and subcategory
 //     if (updateData.category) {
 //       updateData.category = typeof updateData.category === "string"
 //         ? updateData.category.split(",").map((cat) => cat.trim())
@@ -218,7 +218,7 @@ const createProduct = async (req, res) => {
 //         : updateData.subcategory;
 //     }
 
-//     // Handle availableSizes and availableColors
+//     // Handle sizes and colors
 //     if (updateData.availableSizes && !Array.isArray(updateData.availableSizes)) {
 //       updateData.availableSizes = [updateData.availableSizes];
 //     }
@@ -226,23 +226,46 @@ const createProduct = async (req, res) => {
 //       updateData.availableColors = [updateData.availableColors];
 //     }
 
-//     const product = await Product.findByIdAndUpdate(id, updateData, {
+//     // Fetch existing product
+//     const existingProduct = await Product.findById(id);
+//     if (!existingProduct) {
+//       return res.status(404).json({ success: false, message: "Product not found" });
+//     }
+
+//     // Discount calculation logic
+//     if (updateData.discountPercent && updateData.discountPercent > 0) {
+//       const now = new Date();
+//       const startDate = updateData.offerStartDate ? new Date(updateData.offerStartDate) : null;
+//       const endDate = updateData.offerEndDate ? new Date(updateData.offerEndDate) : null;
+
+//       // Offer active check
+//       if ((!startDate || now >= startDate) && (!endDate || now <= endDate)) {
+//         updateData.oldPrice = existingProduct.price; // original price
+//         // Round discounted price to whole number
+//         updateData.price = Math.round(existingProduct.price * (1 - updateData.discountPercent / 100));
+//       } else {
+//         updateData.price = existingProduct.price;
+//         updateData.oldPrice = null;
+//       }
+//     } else {
+//       // No discount, reset
+//       updateData.oldPrice = null;
+//       updateData.price = existingProduct.price;
+//     }
+
+//     // Update product in DB
+//     const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
 //       new: true,
 //       runValidators: true,
 //     });
 
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Product not found",
-//       });
-//     }
-
 //     res.json({
 //       success: true,
-//       product,
+//       product: updatedProduct,
 //     });
+
 //   } catch (error) {
+//     console.error("Update product error:", error);
 //     res.status(500).json({
 //       success: false,
 //       message: "Error updating product",
@@ -253,12 +276,7 @@ const createProduct = async (req, res) => {
 
 
 
-// Update Product with Discount Calculation
-
-
-
-
-
+// Delete product
 
 
 const updateProduct = async (req, res) => {
@@ -293,7 +311,7 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    // Discount calculation logic
+    // Discount logic
     if (updateData.discountPercent && updateData.discountPercent > 0) {
       const now = new Date();
       const startDate = updateData.offerStartDate ? new Date(updateData.offerStartDate) : null;
@@ -301,17 +319,20 @@ const updateProduct = async (req, res) => {
 
       // Offer active check
       if ((!startDate || now >= startDate) && (!endDate || now <= endDate)) {
-        updateData.oldPrice = existingProduct.price; // original price
-        // Round discounted price to whole number
+        updateData.oldPrice = existingProduct.price; // store original price
         updateData.price = Math.round(existingProduct.price * (1 - updateData.discountPercent / 100));
       } else {
-        updateData.price = existingProduct.price;
+        // offer not active
         updateData.oldPrice = null;
+        if (!updateData.price) updateData.price = existingProduct.price;
       }
     } else {
-      // No discount, reset
+      // No discount, allow manual price update if provided
       updateData.oldPrice = null;
-      updateData.price = existingProduct.price;
+      if (updateData.price == null) {
+        // If price not provided, keep existing
+        updateData.price = existingProduct.price;
+      }
     }
 
     // Update product in DB
@@ -324,7 +345,6 @@ const updateProduct = async (req, res) => {
       success: true,
       product: updatedProduct,
     });
-
   } catch (error) {
     console.error("Update product error:", error);
     res.status(500).json({
@@ -335,9 +355,11 @@ const updateProduct = async (req, res) => {
   }
 };
 
+module.exports = { updateProduct };
 
 
-// Delete product
+
+
 const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
