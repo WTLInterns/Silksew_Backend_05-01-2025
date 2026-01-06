@@ -243,24 +243,100 @@ const getOfferById = async (req, res) => {
 
 
 
+// const updateOffer = async (req, res) => {
+//   const { id } = req.params;
+//   const updateData = req.body;
+
+//   try {
+//     const offer = await Offer.findByIdAndUpdate(id, updateData, { new: true });
+
+//     if (!offer) {
+//       return res.status(404).json({ success: false, message: "Offer not found" });
+//     }
+
+//     res.status(200).json({ success: true, offer });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ success: false, message: "Failed to update offer" });
+//   }
+// };
+
 const updateOffer = async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
 
   try {
-    const offer = await Offer.findByIdAndUpdate(id, updateData, { new: true });
+    // Add validation for required fields
+    const requiredFields = ['code', 'offerScope', 'offerType', 'value', 'startDate', 'endDate'];
+    const missingFields = requiredFields.filter(field => !updateData[field]);
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Missing required fields: ${missingFields.join(', ')}` 
+      });
+    }
+
+    // Recalculate the offer details
+    let discountAmount = 0;
+    let discountPercent = 0;
+    let finalPrice = updateData.price || 0;
+
+    if (updateData.price && (updateData.offerScope === "category" || updateData.offerScope === "mahasale")) {
+      if (updateData.offerType === "percentage") {
+        discountPercent = updateData.value;
+        discountAmount = (updateData.price * updateData.value) / 100;
+      } else if (updateData.offerType === "flat") {
+        discountAmount = updateData.value;
+        discountPercent = ((updateData.value / updateData.price) * 100).toFixed(2);
+      }
+
+      finalPrice = updateData.price - discountAmount;
+      if (finalPrice < 0) finalPrice = 0;
+    }
+
+    // Prepare the update object
+    const updateObj = {
+      ...updateData,
+      calculation: {
+        actualPrice: updateData.price || 0,
+        discountAmount,
+        discountPercent: `${discountPercent}%`,
+        finalPrice,
+      },
+      active: Boolean(updateData.active),
+      value: Number(updateData.value)
+    };
+
+    // Only include category if it's a category offer
+    if (updateData.offerScope !== "category") {
+      delete updateObj.category;
+    }
+
+    const offer = await Offer.findByIdAndUpdate(
+      id, 
+      { $set: updateObj },
+      { new: true, runValidators: true }
+    );
 
     if (!offer) {
       return res.status(404).json({ success: false, message: "Offer not found" });
     }
 
-    res.status(200).json({ success: true, offer });
+    res.status(200).json({ 
+      success: true, 
+      message: "Offer updated successfully",
+      offer 
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Failed to update offer" });
+    console.error("Error updating offer:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to update offer",
+      error: error.message 
+    });
   }
 };
-
 
 const deleteOffer = async (req, res) => {
   try {

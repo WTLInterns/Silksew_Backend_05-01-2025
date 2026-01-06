@@ -102,10 +102,23 @@ const getMyOrders = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find().populate("userId", "name email"); // Populate userId to get name and email
+    const orders = await Order.find({})
+      .populate("userId", "name email") // Populate user details
+      .populate({
+        path: "items.productId", // Populate product details in items
+        select: "name price images" // Include only necessary fields
+      })
+      .sort({ createdAt: -1 }); // Sort by newest first
+
+    console.log("Fetched orders:", orders.length); // Log number of orders found
     res.status(200).json(orders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Failed to fetch orders",
+      error: error.message 
+    });
   }
 };
 
@@ -838,34 +851,34 @@ const returnProduct = async (req, res) => {
   try {
     const { orderId, productId } = req.params;
 
-    const order = await Order.findOne({ _id: orderId });
-    console.log(orderId);
-    console.log(productId);
-    console.log(req.user._id.toString());
-
+    // Ensure order exists first
+    const order = await Order.findById(orderId).select('_id items.productId items.returnRequested');
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    const itemIndex = order.items.findIndex(
-      (item) => item.productId.toString() === productId
-    );
-    if (itemIndex === -1) {
+    const item = order.items.find((i) => i.productId.toString() === productId);
+    if (!item) {
       return res.status(404).json({ message: "Product not found in order" });
     }
-
-    const item = order.items[itemIndex];
     if (item.returnRequested) {
-      return res
-        .status(400)
-        .json({ message: "Return already requested for this product" });
+      return res.status(400).json({ message: "Return already requested for this product" });
     }
 
-    item.returnRequested = true;
-    await order.save();
+    // Perform a targeted update to avoid validating unrelated legacy fields
+    const updated = await Order.findOneAndUpdate(
+      { _id: orderId, "items.productId": productId },
+      { $set: { "items.$.returnRequested": true } },
+      { new: true, runValidators: false }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Order or Product not found" });
+    }
 
     res.status(200).json({ message: "Return request submitted successfully" });
   } catch (error) {
+    console.error('Error in returnProduct:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -875,37 +888,27 @@ const saveReturnReason = async (req, res) => {
     const { orderId, productId, reason } = req.body;
 
     if (!orderId || !productId || !reason) {
-      return res
-        .status(400)
-        .json({ message: "OrderId, ProductId, and Reason are required" });
+      return res.status(400).json({ message: "OrderId, ProductId, and Reason are required" });
     }
 
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    const item = order.items.find(
-      (item) => item.productId.toString() === productId
+    const updated = await Order.findOneAndUpdate(
+      { _id: orderId, "items.productId": productId },
+      {
+        $set: {
+          "items.$.returnReason": reason,
+          "items.$.returnRequested": true,
+        },
+      },
+      { new: true, runValidators: false }
     );
-    if (!item) {
-      return res
-        .status(404)
-        .json({ message: "Product not found in the order" });
+
+    if (!updated) {
+      return res.status(404).json({ message: "Order or Product not found" });
     }
 
-    item.returnReason = reason;
-    item.returnRequested = true;
-
-    await order.save();
-
-    res
-      .status(200)
-      .json({ message: "Return reason saved successfully", data: order });
+    res.status(200).json({ message: "Return reason saved successfully", data: updated });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error saving return reason", error: error.message });
+    res.status(500).json({ message: "Error saving return reason", error: error.message });
   }
 };
 

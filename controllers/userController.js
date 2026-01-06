@@ -261,7 +261,7 @@ const resetPassword = async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Password Reset Request",
-      text: `Click this link to reset password: https://api.silksew.com/forgotPassword/${userFind._id}/${setusertoken.verifyToken}`
+      text: `Click this link to reset password: http://localhost:5003/forgotPassword/${userFind._id}/${setusertoken.verifyToken}`
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
