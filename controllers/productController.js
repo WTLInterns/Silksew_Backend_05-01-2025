@@ -198,6 +198,83 @@ const createProduct = async (req, res) => {
 };
 
 
+const getCategoriesSubcategories = async (req, res) => {
+  try {
+    console.log('[DEBUG] Fetching all products for categories...');
+    const products = await Product.find({}).lean();
+    console.log(`[DEBUG] Found ${products.length} products`);
+    
+    if (!products || products.length === 0) {
+      console.log('[INFO] No products found in the database');
+      return res.json({
+        success: true,
+        categories: [],
+        subcategories: []
+      });
+    }
+
+    // Extract unique categories with better error handling
+    const categories = [...new Set(products.flatMap(p => {
+      try {
+        return Array.isArray(p.category) 
+          ? p.category.map(c => String(c || '').trim()).filter(Boolean)
+          : [String(p.category || '').trim()].filter(Boolean);
+      } catch (error) {
+        console.error('[ERROR] Error processing product category:', p?._id, error);
+        return [];
+      }
+    }))];
+
+    // Extract category-subcategory pairs with better error handling
+    const subcategories = products.flatMap(product => {
+      try {
+        if (!product.category || !product.subcategory) return [];
+        
+        const categories = Array.isArray(product.category) 
+          ? product.category.map(c => String(c || '').trim())
+          : [String(product.category || '').trim()];
+        
+        const subcategories = Array.isArray(product.subcategory)
+          ? product.subcategory.map(s => String(s || '').trim())
+          : [String(product.subcategory || '').trim()];
+        
+        return categories.flatMap(cat => 
+          subcategories.map(sub => ({
+            category: cat,
+            subcategory: sub
+          }))
+        ).filter(item => item.category && item.subcategory);
+      } catch (error) {
+        console.error('[ERROR] Error processing product:', product?._id, error);
+        return [];
+      }
+    });
+
+    // Remove duplicates
+    const uniqueSubs = Array.from(
+      new Map(subcategories.map(item => 
+        [`${item.category}-${item.subcategory}`, item]
+      )).values()
+    );
+
+    console.log(`[DEBUG] Found ${categories.length} unique categories`);
+    console.log(`[DEBUG] Found ${uniqueSubs.length} unique subcategories`);
+
+    res.json({
+      success: true,
+      categories: categories.filter(Boolean),
+      subcategories: uniqueSubs
+    });
+
+  } catch (error) {
+    console.error('Error in getCategoriesSubcategories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch categories and subcategories',
+      error: error.message
+    });
+  }
+};
 
 
 // const updateProduct = async (req, res) => {
@@ -358,8 +435,6 @@ const updateProduct = async (req, res) => {
 module.exports = { updateProduct };
 
 
-
-
 const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
@@ -414,4 +489,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getProductList,
+  getCategoriesSubcategories,
 };
+
