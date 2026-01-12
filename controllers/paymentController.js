@@ -1,4 +1,4 @@
-const { stripe } = require('../config/paymentConfig'); // Stripe instance from the paymentConfig file
+const { stripe, razorpay } = require('../config/paymentConfig'); // Stripe and Razorpay instances from the paymentConfig file
 const Order = require('../models/Order'); // Order model to link orders with payments
 const { sendEmail } = require('../services/emailService'); // Assuming you have an email service to notify users
 
@@ -128,9 +128,39 @@ const handlePaymentFailure = (req, res) => {
     }
 };
 
+// Razorpay payment processing
+const razorpayPayment = async (req, res) => {
+    try {
+        const { amount, currency = 'INR', receipt, notes } = req.body;
+
+        // Create Razorpay order
+        const options = {
+            amount: amount * 100, // Amount in paise (1 INR = 100 paise)
+            currency,
+            receipt,
+            notes,
+        };
+
+        const razorpayOrder = await razorpay.orders.create(options);
+
+        res.status(200).json({
+            success: true,
+            order: razorpayOrder,
+        });
+    } catch (error) {
+        console.error('Razorpay order creation error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create Razorpay order',
+            error: error.message,
+        });
+    }
+};
+
 module.exports = {
     createPaymentIntent,
     confirmPayment,
     handlePaymentSuccess,
     handlePaymentFailure,
+    razorpayPayment,
 };

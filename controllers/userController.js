@@ -8,7 +8,98 @@ var bcrypt = require("bcryptjs");
 console.log("EMAIL_USER:", process.env.EMAIL_USER);
 console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "loaded" : "missing");
 
-
+// Google OAuth functions
+const googleAuth = async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    console.log("Received Google token:", token); // Debug log
+    
+    // Simple token verification (for development)
+    // In production, use proper Google token verification
+    const decoded = jwt.decode(token);
+    console.log("Decoded token:", decoded); // Debug log
+    
+    if (!decoded || !decoded.email) {
+      return res.status(400).json({ message: 'Invalid Google token' });
+    }
+    
+    // Check if user already exists with Google ID
+    let user = await User.findOne({ googleId: decoded.sub });
+    
+    if (user) {
+      // User exists, generate JWT
+      const jwtToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+        expiresIn: '1d',
+      });
+      
+      return res.status(200).json({
+        token: jwtToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+        message: 'Login successful'
+      });
+    } else {
+      // Check if user exists with same email (merge accounts)
+      user = await User.findOne({ email: decoded.email });
+      
+      if (user) {
+        // Link Google account to existing user
+        user.googleId = decoded.sub;
+        user.profilePicture = decoded.picture;
+        await user.save();
+        
+        const jwtToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+          expiresIn: '1d',
+        });
+        
+        return res.status(200).json({
+          token: jwtToken,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+          message: 'Google account linked successfully'
+        });
+      } else {
+        // Create new user from Google data
+        const newUser = new User({
+          name: decoded.name,
+          email: decoded.email,
+          googleId: decoded.sub,
+          profilePicture: decoded.picture,
+          role: 'user',
+        });
+        
+        await newUser.save();
+        
+        const jwtToken = jwt.sign({ id: newUser._id, role: newUser.role }, process.env.JWT_SECRET, {
+          expiresIn: '1d',
+        });
+        
+        return res.status(201).json({
+          token: jwtToken,
+          user: {
+            id: newUser._id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role,
+          },
+          message: 'Registration successful'
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({ message: 'Google authentication failed', error: error.message });
+  }
+};
 
 const registerUser = async (req, res) => {
   try {
@@ -226,8 +317,10 @@ const resetPassword = async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Password Reset Request",
-      text: `Click this link to reset password: https://api.silksew.com/forgotPassword/${userFind._id}/${setusertoken.verifyToken}`
+      text: `Click this link to reset password: http://localhost:3000/forgotPassword/${userFind._id}/${token}`
     };
+
+    console.log("Sending reset link:", `http://localhost:3000/forgotPassword/${userFind._id}/${token}`);
 
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
@@ -241,35 +334,41 @@ const resetPassword = async (req, res) => {
 
   } catch (error) {
     console.error("Reset password error:", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Full error:", error);
+    return res.status(500).json({ 
+      message: "Server error during password reset", 
+      error: error.message 
+    });
   }
 };
-
-
-
-// verify user for forgot password time
 
 const forgotPassword = async (req, res) => {
   const { id, token } = req.params;
 
   try {
-    const validUser = await User.findOne({ _id: id, verifyToken: token })
-    const verifyToken = jwt.verify(token, process.env.JWT_SECRET);
-    console.log(verifyToken);
-    if (validUser && verifyToken._id) {
-      res.status(201).json({ status: 201, validUser })
+    console.log("Verifying token for user:", id);
+    console.log("Token received:", token);
+
+    // First verify the JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Decoded token:", decoded);
+
+    // Then check if user exists and has this token
+    const validUser = await User.findOne({ _id: id, verifyToken: token });
+    console.log("Found user:", validUser);
+
+    if (validUser && decoded._id === id) {
+      res.status(200).json({ success: true, message: "Token is valid" });
     } else {
-      res.status(401).json({ status: 401, message: "user not exist" })
+      res.status(401).json({ success: false, message: "Token expired or invalid" });
     }
   } catch (error) {
-    res.status(401).json({ status: 401, error })
+    console.error("Token verification error:", error);
+    res.status(401).json({ success: false, message: "Token expired or invalid" });
   }
-}
+};
 
 // change password
-
-// const changePassword = async (req, res) => {
-//   const { id, token } = req.params;
 
 //   const { password } = req.body;
 //   try {
@@ -409,4 +508,4 @@ const updateUserProfileDetail = async (req, res) => {
 
 
 
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, changePassword, forgotPassword, resetPassword, getUserProfileDetail, updateUserProfileDetail };
+module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, changePassword, forgotPassword, resetPassword, getUserProfileDetail, updateUserProfileDetail, googleAuth };

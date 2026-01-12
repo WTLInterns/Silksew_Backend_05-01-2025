@@ -11,6 +11,7 @@ const {
   changePassword,
   getUserProfileDetail,
   updateUserProfileDetail,
+  googleAuth,
 } = require("../controllers/userController");
 const { protect } = require("../middleware/authMiddleware");
 const User = require("../models/User");
@@ -18,6 +19,7 @@ const User = require("../models/User");
 // Public routes
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/google", googleAuth);
 
 // Protected routes
 router.get("/profile", protect, getUserProfile);

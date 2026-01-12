@@ -202,7 +202,6 @@ Manage Preferences: https://silksew.com/preferences`;
   }
 };
 
-
 // ✅ Get all subscribers (Admin)
 // const getAllSubscribers = async (req, res) => {
 //   try {

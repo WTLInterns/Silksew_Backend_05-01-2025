@@ -5,49 +5,74 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId || this.password;
+      },
       trim: true,
     },
     email: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId || this.password;
+      },
       unique: true,
       lowercase: true,
     },
     password: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       minlength: 6,
     },
     phone: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       length: 10,
     },
     street: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       lowercase: true,
     },
     city: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       lowercase: true,
     },
     state: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       lowercase: true,
     },
     zipcode: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId;
+      },
       lowercase: true,
     },
     role: {
       type: String,
       enum: ["user", "admin"],
       default: "user",
+    },
+    // Google OAuth fields
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows multiple null values
+    },
+    profilePicture: {
+      type: String,
     },
     tokens: [
       {

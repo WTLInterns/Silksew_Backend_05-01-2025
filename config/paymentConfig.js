@@ -1,4 +1,4 @@
-// paymentConfig.js (For PayPal)
+// paymentConfig.js
 
 require('dotenv').config();
 
@@ -11,8 +11,17 @@ paypal.configure({
     client_secret: process.env.PAYPAL_CLIENT_SECRET,
 });
 
+// Razorpay configuration
+const Razorpay = require('razorpay');
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 const paymentConfig = {
     paypal,
+    razorpay,
     // You can add other payment provider configurations here
 };
 

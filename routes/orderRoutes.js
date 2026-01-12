@@ -15,7 +15,17 @@ const {
   saveReturnReason,
   // updateReturnStatus,
   updateReturnAction,
-  getTrackingData
+  getTrackingData,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  // Merged payment functions
+  createPaymentIntent,
+  confirmPayment,
+  handlePaymentSuccess,
+  handlePaymentFailure,
+  razorpayPayment,
+  // Order process function
+  updateOrderProcess
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -29,16 +39,26 @@ router.get("/myorders", protect, getMyOrders);
 // Get all orders (admin-only route)
 router.get("/", protect, getAllOrders);
 
-// Payment Features
+// Payment Features (merged from payment controller)
 router.post("/place", protect, placeOrder);
-
 router.get("/track/:orderId", getTrackingData);
 
+// Stripe payment routes (merged)
 router.post("/stripe", protect, placeOrderStripe);
-router.post("/razorpay", protect, placeOrderRazorpay);
+router.post("/create-payment-intent", protect, createPaymentIntent);
+router.post("/confirm-payment", protect, confirmPayment);
+router.post("/payment-success", handlePaymentSuccess);
+router.post("/payment-failure", handlePaymentFailure);
 
+// Razorpay payment routes (merged)
+router.post("/razorpay", protect, razorpayPayment);
+router.post("/create-razorpay-order", protect, createRazorpayOrder);
+router.post("/verify-razorpay-payment", protect, verifyRazorpayPayment);
+
+// Order management routes
 router.post("/order-status", updateOrderStatus);
 router.post("/payment-status", updatePaymentStatus);
+router.post("/update-order-process", protect, updateOrderProcess);
 
 router.post("/send-confirmation-email", async (req, res) => {
   try {

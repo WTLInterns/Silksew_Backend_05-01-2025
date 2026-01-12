@@ -56,7 +56,7 @@ const orderSchema = new mongoose.Schema(
     finalAmount: Number,
     paymentMethod: { 
       type: String, 
-      enum: ["Credit Card", "Debit Card", "PayPal", "Cash on Delivery"], 
+      enum: ["Credit Card", "Debit Card", "PayPal", "Cash on Delivery", "Razorpay"], 
       required: false 
     },
     address: { type: Object, required: true },
@@ -65,8 +65,19 @@ const orderSchema = new mongoose.Schema(
     date: { type: Date, default: Date.now },
     tentativeDeliveryDate: { type: Date }, // optional
     shiprocketOrderId: { type: String }, // Shiprocket order id save करायला
-  },
-  { timestamps: true }
+    razorpay_order_id: { type: String }, // Razorpay order ID
+    razorpay_payment_id: { 
+      type: String, 
+      unique: true, 
+      sparse: true 
+    }, // Razorpay payment ID
+    razorpay_signature: { type: String }, // Razorpay signature for verification
+    orderProcess: { 
+      type: String, 
+      enum: ["Order Placed", "Packed", "Shipped", "Delivered", "Cancelled"], 
+      default: "Order Placed" 
+    },
+  },{ timestamps: true }
 );
 
 module.exports = mongoose.model("Order", orderSchema);
