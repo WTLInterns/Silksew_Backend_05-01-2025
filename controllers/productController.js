@@ -480,11 +480,61 @@ const getProductList = async (req, res) => {
   }
 };
 
+// Get products by multiple subcategories
+const getProductsByMultipleSubcategories = async (req, res) => {
+  try {
+    const { subcategories, category } = req.query;
+
+    if (!subcategories) {
+      return res.status(400).json({
+        success: false,
+        message: "Subcategories parameter is required",
+      });
+    }
+
+    // Parse subcategories from comma-separated string
+    const subcategoryArray = subcategories.split(',').map(sub => sub.trim());
+    
+    // Build query to find products matching any of the subcategories
+    const query = {
+      subcategory: {
+        $in: subcategoryArray.map(sub => new RegExp(sub, 'i'))
+      }
+    };
+
+    // If category is provided, also filter by category
+    if (category) {
+      query.category = {
+        $elemMatch: {
+          $regex: new RegExp(category, 'i')
+        }
+      };
+    }
+
+    const products = await Product.find(query);
+
+    res.json({
+      success: true,
+      count: products.length,
+      subcategories: subcategoryArray,
+      category,
+      products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching products by multiple subcategories",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
   getProductsBySubcategory,
   getProductsByCategory,
+  getProductsByMultipleSubcategories,
   createProduct,
   updateProduct,
   deleteProduct,

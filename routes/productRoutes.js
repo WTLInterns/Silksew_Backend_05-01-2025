@@ -10,6 +10,7 @@ const {
   getProductList,
   getProductsBySubcategory,
   getProductsByCategory,
+  getProductsByMultipleSubcategories,
   getCategoriesSubcategories,
 } = require('../controllers/productController');
 const { protect, isAdmin } = require('../middleware/authMiddleware');
@@ -37,6 +38,7 @@ router.get('/', getAllProducts);
 router.get('/list', getProductList);
 router.get('/by-subcategory', getProductsBySubcategory);
 router.get('/by-category', getProductsByCategory);
+router.get('/by-multiple-subcategories', getProductsByMultipleSubcategories);
 // Specific routes should come before parameterized routes
 // Parameterized routes should come last
 router.get('/:id', validateObjectId, getProductById);
